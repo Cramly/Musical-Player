@@ -1,0 +1,4 @@
+C:\Users\User\Desktop\C#\ПлеерОганян\obj\Debug\ПлеерОганян.csproj.AssemblyReference.cache
+C:\Users\User\Desktop\C#\ПлеерОганян\obj\Debug\ПлеерОганян.Properties.Resources.resources
+C:\Users\User\Desktop\C#\ПлеерОганян\obj\Debug\ПлеерОганян.csproj.GenerateResource.cache
+C:\Users\User\Desktop\C#\ПлеерОганян\obj\Debug\ПлеерОганян.csproj.CoreCompileInputs.cache
