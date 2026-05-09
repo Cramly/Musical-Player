@@ -18,8 +18,20 @@ namespace ПлеерОганян
         private readonly RelayCommand _stopCommand;
         private readonly RelayCommand _nextCommand;
         private readonly RelayCommand _previousCommand;
+        private readonly RelayCommand _createPlaylistCommand;
+        private readonly RelayCommand _deletePlaylistCommand;
+        private readonly RelayCommand _addToPlaylistCommand;
+        private readonly RelayCommand _addToQueueAndPlayCommand;
+        private readonly RelayCommand _removeQueueTrackCommand;
+        private readonly RelayCommand _clearQueueCommand;
+        private readonly RelayCommand _openLibraryCommand;
         private readonly Random _random = new Random();
+
         private Track _selectedTrack;
+        private Playlist _selectedPlaylist;
+        private Playlist _selectedPlaylistForAdd;
+        private Track _selectedQueueTrack;
+        private Track _currentQueueTrack;
         private TimeSpan _currentPosition;
         private TimeSpan _duration;
         private double _sliderPosition;
@@ -29,18 +41,26 @@ namespace ПлеерОганян
         private bool _isShuffleEnabled;
         private bool _isRepeatTrackEnabled;
         private bool _isRepeatPlaylistEnabled;
+        private int _playlistCounter = 1;
+        private ICollectionView _displayedTracksView;
 
         public MainViewModel()
         {
-            TracksView = CollectionViewSource.GetDefaultView(Tracks);
-            TracksView.Filter = FilterTrack;
+            UpdateDisplayedTracksView();
 
             LoadFolderCommand = new RelayCommand(LoadFolder);
             _playCommand = new RelayCommand(Play, () => SelectedTrack != null);
             _pauseCommand = new RelayCommand(Pause);
             _stopCommand = new RelayCommand(Stop);
-            _nextCommand = new RelayCommand(Next, () => Tracks.Count > 0 && SelectedTrack != null);
-            _previousCommand = new RelayCommand(Previous, () => Tracks.Count > 0 && SelectedTrack != null);
+            _nextCommand = new RelayCommand(Next, () => SelectedTrack != null);
+            _previousCommand = new RelayCommand(Previous, () => SelectedTrack != null);
+            _createPlaylistCommand = new RelayCommand(CreatePlaylist);
+            _deletePlaylistCommand = new RelayCommand(DeletePlaylist, () => SelectedPlaylist != null);
+            _addToPlaylistCommand = new RelayCommand(AddSelectedTrackToPlaylist, () => SelectedTrack != null && SelectedPlaylistForAdd != null);
+            _addToQueueAndPlayCommand = new RelayCommand(AddSelectedTrackToQueueAndPlay, () => SelectedTrack != null);
+            _removeQueueTrackCommand = new RelayCommand(RemoveSelectedQueueTrack, () => SelectedQueueTrack != null);
+            _clearQueueCommand = new RelayCommand(ClearQueue, () => QueueTracks.Count > 0);
+            _openLibraryCommand = new RelayCommand(OpenLibrary);
 
             _playerService.PositionChanged += OnPlayerPositionChanged;
             _playerService.TrackEnded += OnTrackEnded;
@@ -49,7 +69,19 @@ namespace ПлеерОганян
 
         public ObservableCollection<Track> Tracks { get; } = new ObservableCollection<Track>();
 
-        public ICollectionView TracksView { get; }
+        public ObservableCollection<Playlist> Playlists { get; } = new ObservableCollection<Playlist>();
+
+        public ObservableCollection<Track> QueueTracks { get; } = new ObservableCollection<Track>();
+
+        public ICollectionView DisplayedTracksView
+        {
+            get => _displayedTracksView;
+            private set
+            {
+                _displayedTracksView = value;
+                OnPropertyChanged();
+            }
+        }
 
         public Track SelectedTrack
         {
@@ -67,6 +99,73 @@ namespace ПлеерОганян
                 _playCommand.RaiseCanExecuteChanged();
                 _nextCommand.RaiseCanExecuteChanged();
                 _previousCommand.RaiseCanExecuteChanged();
+                _addToPlaylistCommand.RaiseCanExecuteChanged();
+                _addToQueueAndPlayCommand.RaiseCanExecuteChanged();
+            }
+        }
+
+        public Playlist SelectedPlaylist
+        {
+            get => _selectedPlaylist;
+            set
+            {
+                if (_selectedPlaylist == value)
+                {
+                    return;
+                }
+
+                _selectedPlaylist = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsLibrarySelected));
+                _deletePlaylistCommand.RaiseCanExecuteChanged();
+                UpdateDisplayedTracksView();
+            }
+        }
+
+        public Playlist SelectedPlaylistForAdd
+        {
+            get => _selectedPlaylistForAdd;
+            set
+            {
+                if (_selectedPlaylistForAdd == value)
+                {
+                    return;
+                }
+
+                _selectedPlaylistForAdd = value;
+                OnPropertyChanged();
+                _addToPlaylistCommand.RaiseCanExecuteChanged();
+            }
+        }
+
+        public Track SelectedQueueTrack
+        {
+            get => _selectedQueueTrack;
+            set
+            {
+                if (_selectedQueueTrack == value)
+                {
+                    return;
+                }
+
+                _selectedQueueTrack = value;
+                OnPropertyChanged();
+                _removeQueueTrackCommand.RaiseCanExecuteChanged();
+            }
+        }
+
+        public Track CurrentQueueTrack
+        {
+            get => _currentQueueTrack;
+            set
+            {
+                if (_currentQueueTrack == value)
+                {
+                    return;
+                }
+
+                _currentQueueTrack = value;
+                OnPropertyChanged();
             }
         }
 
@@ -82,7 +181,7 @@ namespace ПлеерОганян
 
                 _searchText = value ?? string.Empty;
                 OnPropertyChanged();
-                TracksView.Refresh();
+                DisplayedTracksView?.Refresh();
             }
         }
 
@@ -214,6 +313,8 @@ namespace ПлеерОганян
             }
         }
 
+        public bool IsLibrarySelected => SelectedPlaylist == null;
+
         public string SelectedTrackTitle => SelectedTrack?.Title ?? "Трек не выбран";
 
         public string CurrentPositionText => FormatTime(CurrentPosition);
@@ -231,6 +332,20 @@ namespace ПлеерОганян
         public ICommand NextCommand => _nextCommand;
 
         public ICommand PreviousCommand => _previousCommand;
+
+        public ICommand CreatePlaylistCommand => _createPlaylistCommand;
+
+        public ICommand DeletePlaylistCommand => _deletePlaylistCommand;
+
+        public ICommand AddToPlaylistCommand => _addToPlaylistCommand;
+
+        public ICommand AddToQueueAndPlayCommand => _addToQueueAndPlayCommand;
+
+        public ICommand RemoveQueueTrackCommand => _removeQueueTrackCommand;
+
+        public ICommand ClearQueueCommand => _clearQueueCommand;
+
+        public ICommand OpenLibraryCommand => _openLibraryCommand;
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -253,11 +368,8 @@ namespace ПлеерОганян
                 Tracks.Add(CreateTrack(filePath));
             }
 
-            TracksView.Refresh();
-            SelectedTrack = TracksView.Cast<Track>().FirstOrDefault();
-            Stop();
-            _nextCommand.RaiseCanExecuteChanged();
-            _previousCommand.RaiseCanExecuteChanged();
+            DisplayedTracksView?.Refresh();
+            SelectedTrack = DisplayedTracksView?.Cast<Track>().FirstOrDefault();
         }
 
         private void Play()
@@ -267,6 +379,7 @@ namespace ПлеерОганян
                 return;
             }
 
+            CurrentQueueTrack = QueueTracks.Contains(SelectedTrack) ? SelectedTrack : null;
             _playerService.Play(SelectedTrack.Path);
         }
 
@@ -282,6 +395,11 @@ namespace ПлеерОганян
 
         private void Next()
         {
+            if (TryPlayNextFromQueue())
+            {
+                return;
+            }
+
             if (Tracks.Count == 0 || SelectedTrack == null)
             {
                 return;
@@ -289,8 +407,7 @@ namespace ПлеерОганян
 
             if (IsShuffleEnabled)
             {
-                SelectedTrack = GetRandomTrack();
-                Play();
+                PlayTrack(GetRandomTrack(), false);
                 return;
             }
 
@@ -302,12 +419,16 @@ namespace ПлеерОганян
             }
 
             var nextIndex = (currentIndex + 1) % Tracks.Count;
-            SelectedTrack = Tracks[nextIndex];
-            Play();
+            PlayTrack(Tracks[nextIndex], false);
         }
 
         private void Previous()
         {
+            if (TryPlayPreviousFromQueue())
+            {
+                return;
+            }
+
             if (Tracks.Count == 0 || SelectedTrack == null)
             {
                 return;
@@ -321,8 +442,96 @@ namespace ПлеерОганян
             }
 
             var previousIndex = (currentIndex - 1 + Tracks.Count) % Tracks.Count;
-            SelectedTrack = Tracks[previousIndex];
-            Play();
+            PlayTrack(Tracks[previousIndex], false);
+        }
+
+        private void CreatePlaylist()
+        {
+            var playlist = new Playlist
+            {
+                Name = $"Новый плейлист {_playlistCounter++}"
+            };
+
+            Playlists.Add(playlist);
+            SelectedPlaylist = playlist;
+
+            if (SelectedPlaylistForAdd == null)
+            {
+                SelectedPlaylistForAdd = playlist;
+            }
+        }
+
+        private void DeletePlaylist()
+        {
+            if (SelectedPlaylist == null)
+            {
+                return;
+            }
+
+            if (SelectedPlaylistForAdd == SelectedPlaylist)
+            {
+                SelectedPlaylistForAdd = null;
+            }
+
+            Playlists.Remove(SelectedPlaylist);
+            SelectedPlaylist = null;
+
+            if (SelectedPlaylistForAdd == null)
+            {
+                SelectedPlaylistForAdd = Playlists.FirstOrDefault();
+            }
+        }
+
+        private void AddSelectedTrackToPlaylist()
+        {
+            if (SelectedTrack == null || SelectedPlaylistForAdd == null)
+            {
+                return;
+            }
+
+            SelectedPlaylistForAdd.Tracks.Add(SelectedTrack);
+        }
+
+        private void AddSelectedTrackToQueueAndPlay()
+        {
+            if (SelectedTrack == null)
+            {
+                return;
+            }
+
+            QueueTracks.Add(SelectedTrack);
+            _clearQueueCommand.RaiseCanExecuteChanged();
+            PlayTrack(SelectedTrack, true);
+        }
+
+        private void RemoveSelectedQueueTrack()
+        {
+            if (SelectedQueueTrack == null)
+            {
+                return;
+            }
+
+            if (CurrentQueueTrack == SelectedQueueTrack)
+            {
+                CurrentQueueTrack = null;
+            }
+
+            QueueTracks.Remove(SelectedQueueTrack);
+            SelectedQueueTrack = null;
+            _clearQueueCommand.RaiseCanExecuteChanged();
+        }
+
+        private void ClearQueue()
+        {
+            QueueTracks.Clear();
+            CurrentQueueTrack = null;
+            SelectedQueueTrack = null;
+            _clearQueueCommand.RaiseCanExecuteChanged();
+        }
+
+        private void OpenLibrary()
+        {
+            SelectedPlaylist = null;
         }
 
         private void OnPlayerPositionChanged(TimeSpan currentPosition, TimeSpan duration)
@@ -339,7 +548,7 @@ namespace ПлеерОганян
 
         private void OnTrackEnded()
         {
-            if (SelectedTrack == null || Tracks.Count == 0)
+            if (SelectedTrack == null)
             {
                 return;
             }
@@ -350,10 +559,19 @@ namespace ПлеерОганян
                 return;
             }
 
+            if (TryPlayNextFromQueue())
+            {
+                return;
+            }
+
+            if (Tracks.Count == 0)
+            {
+                return;
+            }
+
             if (IsShuffleEnabled)
             {
-                SelectedTrack = GetRandomTrack();
-                Play();
+                PlayTrack(GetRandomTrack(), false);
                 return;
             }
 
@@ -366,19 +584,71 @@ namespace ПлеерОганян
 
             if (currentIndex < Tracks.Count - 1)
             {
-                SelectedTrack = Tracks[currentIndex + 1];
-                Play();
+                PlayTrack(Tracks[currentIndex + 1], false);
                 return;
             }
 
             if (IsRepeatPlaylistEnabled)
             {
-                SelectedTrack = Tracks[0];
-                Play();
+                PlayTrack(Tracks[0], false);
                 return;
             }
 
             Stop();
+        }
+
+        private bool TryPlayNextFromQueue()
+        {
+            if (QueueTracks.Count == 0)
+            {
+                return false;
+            }
+
+            if (CurrentQueueTrack == null || !QueueTracks.Contains(CurrentQueueTrack))
+            {
+                PlayTrack(QueueTracks[0], true);
+                return true;
+            }
+
+            var currentIndex = QueueTracks.IndexOf(CurrentQueueTrack);
+
+            if (currentIndex >= 0 && currentIndex < QueueTracks.Count - 1)
+            {
+                PlayTrack(QueueTracks[currentIndex + 1], true);
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool TryPlayPreviousFromQueue()
+        {
+            if (QueueTracks.Count == 0 || CurrentQueueTrack == null || !QueueTracks.Contains(CurrentQueueTrack))
+            {
+                return false;
+            }
+
+            var currentIndex = QueueTracks.IndexOf(CurrentQueueTrack);
+
+            if (currentIndex <= 0)
+            {
+                return false;
+            }
+
+            PlayTrack(QueueTracks[currentIndex - 1], true);
+            return true;
+        }
+
+        private void PlayTrack(Track track, bool fromQueue)
+        {
+            if (track == null)
+            {
+                return;
+            }
+
+            SelectedTrack = track;
+            CurrentQueueTrack = fromQueue ? track : null;
+            _playerService.Play(track.Path);
         }
 
         private Track GetRandomTrack()
@@ -413,6 +683,21 @@ namespace ПлеерОганян
 
             return track.Title.Contains(SearchText, StringComparison.OrdinalIgnoreCase) ||
                    track.Artist.Contains(SearchText, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void UpdateDisplayedTracksView()
+        {
+            var source = SelectedPlaylist?.Tracks ?? Tracks;
+            DisplayedTracksView = CollectionViewSource.GetDefaultView(source);
+            DisplayedTracksView.Filter = FilterTrack;
+            DisplayedTracksView.Refresh();
+
+            var firstTrack = DisplayedTracksView.Cast<Track>().FirstOrDefault();
+
+            if (SelectedTrack == null || !source.Contains(SelectedTrack))
+            {
+                SelectedTrack = firstTrack;
+            }
         }
 
         private static Track CreateTrack(string filePath)
