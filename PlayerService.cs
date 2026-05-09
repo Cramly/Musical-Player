@@ -20,6 +20,7 @@ namespace ПлеерОганян
             _mediaPlayer.Volume = 0.5;
             _timer.Tick += (_, _) => RaisePositionChanged();
             _mediaPlayer.MediaOpened += (_, _) => RaisePositionChanged();
+            _mediaPlayer.MediaEnded += (_, _) => OnMediaEnded();
         }
 
         public TimeSpan CurrentPosition => _mediaPlayer.Position;
@@ -32,6 +33,8 @@ namespace ПлеерОганян
         public double Volume => _mediaPlayer.Volume;
 
         public event Action<TimeSpan, TimeSpan> PositionChanged;
+
+        public event Action TrackEnded;
 
         public void Play(string path)
         {
@@ -93,6 +96,13 @@ namespace ПлеерОганян
             }
 
             _mediaPlayer.Volume = volume;
+        }
+
+        private void OnMediaEnded()
+        {
+            _timer.Stop();
+            RaisePositionChanged();
+            TrackEnded?.Invoke();
         }
 
         private void RaisePositionChanged()

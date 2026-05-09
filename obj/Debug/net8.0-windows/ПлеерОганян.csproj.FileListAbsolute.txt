@@ -25,3 +25,4 @@ C:\Users\User\Desktop\C#\ПлеерОганян\obj\Debug\net8.0-windows\Generat
 C:\Users\User\Desktop\C#\ПлеерОганян\bin\Debug\net8.0-windows\TagLibSharp.dll
 C:\Users\User\Desktop\C#\ПлеерОганян\obj\Debug\net8.0-windows\ПлеерОганян.csproj.AssemblyReference.cache
 C:\Users\User\Desktop\C#\ПлеерОганян\obj\Debug\net8.0-windows\________.C3E09A5F.Up2Date
+C:\Users\User\Desktop\C#\ПлеерОганян\obj\Debug\net8.0-windows\ПлеерОганян.sourcelink.json

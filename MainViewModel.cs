@@ -18,6 +18,7 @@ namespace ПлеерОганян
         private readonly RelayCommand _stopCommand;
         private readonly RelayCommand _nextCommand;
         private readonly RelayCommand _previousCommand;
+        private readonly Random _random = new Random();
         private Track _selectedTrack;
         private TimeSpan _currentPosition;
         private TimeSpan _duration;
@@ -25,6 +26,9 @@ namespace ПлеерОганян
         private double _volume;
         private bool _isUpdatingFromPlayer;
         private string _searchText = string.Empty;
+        private bool _isShuffleEnabled;
+        private bool _isRepeatTrackEnabled;
+        private bool _isRepeatPlaylistEnabled;
 
         public MainViewModel()
         {
@@ -39,6 +43,7 @@ namespace ПлеерОганян
             _previousCommand = new RelayCommand(Previous, () => Tracks.Count > 0 && SelectedTrack != null);
 
             _playerService.PositionChanged += OnPlayerPositionChanged;
+            _playerService.TrackEnded += OnTrackEnded;
             Volume = _playerService.Volume;
         }
 
@@ -164,6 +169,51 @@ namespace ПлеерОганян
             }
         }
 
+        public bool IsShuffleEnabled
+        {
+            get => _isShuffleEnabled;
+            set
+            {
+                if (_isShuffleEnabled == value)
+                {
+                    return;
+                }
+
+                _isShuffleEnabled = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsRepeatTrackEnabled
+        {
+            get => _isRepeatTrackEnabled;
+            set
+            {
+                if (_isRepeatTrackEnabled == value)
+                {
+                    return;
+                }
+
+                _isRepeatTrackEnabled = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsRepeatPlaylistEnabled
+        {
+            get => _isRepeatPlaylistEnabled;
+            set
+            {
+                if (_isRepeatPlaylistEnabled == value)
+                {
+                    return;
+                }
+
+                _isRepeatPlaylistEnabled = value;
+                OnPropertyChanged();
+            }
+        }
+
         public string SelectedTrackTitle => SelectedTrack?.Title ?? "Трек не выбран";
 
         public string CurrentPositionText => FormatTime(CurrentPosition);
@@ -237,6 +287,13 @@ namespace ПлеерОганян
                 return;
             }
 
+            if (IsShuffleEnabled)
+            {
+                SelectedTrack = GetRandomTrack();
+                Play();
+                return;
+            }
+
             var currentIndex = Tracks.IndexOf(SelectedTrack);
 
             if (currentIndex < 0)
@@ -278,6 +335,68 @@ namespace ПлеерОганян
                 ? currentPosition.TotalSeconds / duration.TotalSeconds * 100.0
                 : 0;
             _isUpdatingFromPlayer = false;
+        }
+
+        private void OnTrackEnded()
+        {
+            if (SelectedTrack == null || Tracks.Count == 0)
+            {
+                return;
+            }
+
+            if (IsRepeatTrackEnabled)
+            {
+                Play();
+                return;
+            }
+
+            if (IsShuffleEnabled)
+            {
+                SelectedTrack = GetRandomTrack();
+                Play();
+                return;
+            }
+
+            var currentIndex = Tracks.IndexOf(SelectedTrack);
+
+            if (currentIndex < 0)
+            {
+                return;
+            }
+
+            if (currentIndex < Tracks.Count - 1)
+            {
+                SelectedTrack = Tracks[currentIndex + 1];
+                Play();
+                return;
+            }
+
+            if (IsRepeatPlaylistEnabled)
+            {
+                SelectedTrack = Tracks[0];
+                Play();
+                return;
+            }
+
+            Stop();
+        }
+
+        private Track GetRandomTrack()
+        {
+            if (Tracks.Count == 1)
+            {
+                return Tracks[0];
+            }
+
+            Track randomTrack;
+
+            do
+            {
+                randomTrack = Tracks[_random.Next(Tracks.Count)];
+            }
+            while (randomTrack == SelectedTrack);
+
+            return randomTrack;
         }
 
         private bool FilterTrack(object item)

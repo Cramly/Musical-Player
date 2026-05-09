@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ПлеерОганян"
         mc:Ignorable="d"
-        Title="Библиотека" Height="550" Width="900">
+        Title="Библиотека" Height="580" Width="980">
     <Window.DataContext>
         <local:MainViewModel />
     </Window.DataContext>
@@ -56,6 +56,19 @@
                     Padding="10,6"
                     Margin="0,0,12,0"
                     Command="{Binding NextCommand}" />
+
+            <CheckBox Content="Shuffle"
+                      VerticalAlignment="Center"
+                      Margin="0,0,12,0"
+                      IsChecked="{Binding IsShuffleEnabled, Mode=TwoWay}" />
+            <CheckBox Content="Repeat Track"
+                      VerticalAlignment="Center"
+                      Margin="0,0,12,0"
+                      IsChecked="{Binding IsRepeatTrackEnabled, Mode=TwoWay}" />
+            <CheckBox Content="Repeat Playlist"
+                      VerticalAlignment="Center"
+                      Margin="0,0,12,0"
+                      IsChecked="{Binding IsRepeatPlaylistEnabled, Mode=TwoWay}" />
 
             <TextBlock VerticalAlignment="Center"
                        Margin="0,0,8,0"
